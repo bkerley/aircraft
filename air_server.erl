@@ -25,7 +25,7 @@
 
 %% API
 start_link(Port) ->
-    gen_server:start_link({local, ?SERVER, ?MODULE, [Port]}, []).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [Port], []).
 
 get_count() ->
     gen_server:call(?SERVER, get_count).
