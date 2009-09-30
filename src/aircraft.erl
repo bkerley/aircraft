@@ -6,7 +6,7 @@
          stop/1
          ]).
 
-start(Type, StartArgs) ->
+start(_Type, StartArgs) ->
     case air_sup:start_link(StartArgs) of
         {ok, Pid} ->
             {ok, Pid};
@@ -14,5 +14,5 @@ start(Type, StartArgs) ->
             Error
     end.
 
-stop(State) ->
+stop(_State) ->
     ok.

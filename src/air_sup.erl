@@ -8,7 +8,7 @@
 -define(SERVER, ?MODULE).
 
 start_link(StartArgs) ->
-    supervisor_start_link({local, ?SERVER}, ?MODULE, StartArgs).
+    supervisor:start_link({local, ?SERVER}, ?MODULE, StartArgs).
 
 init(_StartArgs) ->
     AircraftServer = {air_server, {air_server, start_link, 6667},
