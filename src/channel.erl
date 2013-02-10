@@ -95,6 +95,9 @@ validate_channel_name(BinaryName) ->
   ?_assertEqual(invalid, normalize_channel_name(Name))).
 
 channel_name_test_() ->
+  % channel names under consideration are mostly from
+  % sam stephenson's hector
+  % https://github.com/sstephenson/hector/blob/master/test/integration/channels_test.rb
   [
    % types
    ?should_be_badarg(5),
@@ -102,8 +105,8 @@ channel_name_test_() ->
    % actual channels
    ?should_be_valid(<<"#aesthetes">>),
    ?should_be_valid("#rubygems-trust"),
-   ?should_be_invalid("butt channel"),
-   ?should_be_invalid(<<"butt channel">>),
+   ?should_be_invalid("asdf channel"),
+   ?should_be_invalid(<<"asdf channel">>),
    % starting characters
    ?should_be_valid("+test"),
    ?should_be_valid("&test"),
