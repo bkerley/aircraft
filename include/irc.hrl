@@ -1,0 +1,1 @@
+-record(ircmesg, {prefix=[], command=[], params=[]}).
