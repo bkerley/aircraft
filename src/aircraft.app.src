@@ -1,0 +1,12 @@
+{application, aircraft,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { aircraft_app, []}},
+  {env, []}
+ ]}.
