@@ -81,39 +81,40 @@ validate_channel_name(BinaryName) ->
 
 %% tests
 -ifdef(TEST).
-channel_name_test_() ->
-  [
-   % types
-   should_be_badarg(5),
-   should_be_badarg(toot),
-   % actual channels
-   should_be_valid(<<"#aesthetes">>),
-   % should_be_valid("#rubygems-trust"),
-   should_be_invalid("butt channel"),
-   should_be_invalid(<<"butt channel">>),
-   % starting characters
-   should_be_valid("+test"),
-   should_be_valid("&test"),
-   should_be_valid("!test"),
-   should_be_invalid("@test"),
-   % prefix characters
-   should_be_valid("##"),
-   should_be_valid("#test#"),
-   should_be_valid("#&"),
-   should_be_valid("++&#"),
-   should_be_valid("!te&t")
-   % should_be_valid("#8*(&x")
-  ].
 
-should_be_valid(Name) -> 
+-define(should_be_badarg(Name), 
+  ?_assertEqual(badarg, normalize_channel_name(Name))).
+-define(should_be_valid(Name),
   ?LET(NormalizedName, normalize_channel_name(Name), 
   [
    ?_assertEqual(NormalizedName, NormalizedName),
    ?_assertNotEqual(invalid, NormalizedName),
    ?_assertNotEqual(badarg, NormalizedName)
-  ]).
-should_be_badarg(Name) ->
-  ?_assertEqual(badarg, normalize_channel_name(Name)).
-should_be_invalid(Name) ->
-  ?_assertEqual(invalid, normalize_channel_name(Name)).
+  ])).
+-define(should_be_invalid(Name),
+  ?_assertEqual(invalid, normalize_channel_name(Name))).
+
+channel_name_test_() ->
+  [
+   % types
+   ?should_be_badarg(5),
+   ?should_be_badarg(toot),
+   % actual channels
+   ?should_be_valid(<<"#aesthetes">>),
+   ?should_be_valid("#rubygems-trust"),
+   ?should_be_invalid("butt channel"),
+   ?should_be_invalid(<<"butt channel">>),
+   % starting characters
+   ?should_be_valid("+test"),
+   ?should_be_valid("&test"),
+   ?should_be_valid("!test"),
+   ?should_be_invalid("@test"),
+   % prefix characters
+   ?should_be_valid("##"),
+   ?should_be_valid("#test#"),
+   ?should_be_valid("#&"),
+   ?should_be_valid("++&#"),
+   ?should_be_valid("!te&t"),
+   ?should_be_valid("#8*(&x")
+  ].
 -endif.
