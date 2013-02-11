@@ -65,9 +65,7 @@ code_change(_OldVsn, State, _Extra) ->
 normalize_channel_name(OriginalName) when is_list(OriginalName) ->
   normalize_channel_name(list_to_binary(OriginalName));
 normalize_channel_name(OriginalName) when is_binary(OriginalName) ->
-  validate_channel_name(OriginalName);
-normalize_channel_name(_) ->
-  badarg.
+  validate_channel_name(OriginalName).
 
 validate_channel_name(BinaryName) ->
   % regexp from sam stephenson's hector
@@ -99,9 +97,6 @@ channel_name_test_() ->
   % sam stephenson's hector
   % https://github.com/sstephenson/hector/blob/master/test/integration/channels_test.rb
   [
-   % types
-   ?should_be_badarg(5),
-   ?should_be_badarg(toot),
    % actual channels
    ?should_be_valid(<<"#aesthetes">>),
    ?should_be_valid("#rubygems-trust"),
