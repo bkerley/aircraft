@@ -71,8 +71,8 @@ validate_channel_name(BinaryName) ->
   % regexp from sam stephenson's hector
   % https://github.com/sstephenson/hector/blob/master/lib/hector/channel.rb
 
-  {ok, Re} = re:compile("^[#&+!][#&+!\\-\\w\\p{L}\\p{M}\\p{N}\\p{S}\\p{P}\\p{Co}]{1,49}$", [unicode]),
-  case re:run(BinaryName, Re) of
+  Re = "^[#&+!][#&+!\\-\\w\\p{L}\\p{M}\\p{N}\\p{S}\\p{P}\\p{Co}]{1,49}$",
+  case re:run(BinaryName, Re, [unicode]) of
     {match, _} -> BinaryName;
     _ -> invalid
   end.
