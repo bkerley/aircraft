@@ -5,8 +5,8 @@ Design
 ------
 
 * aircraft
-* connection
-* channel
+* connection (routes messages to sockets and vice versa)
+* channel (routes chats to connections)
 * channel_manager (resolves channels to pids)
 
 Credits
