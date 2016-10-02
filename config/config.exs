@@ -10,7 +10,10 @@ use Mix.Config
 
 # You can configure for your application as:
 #
-#     config :aircraft, key: :value
+config(:aircraft,
+       port: 6667,
+       max_connections: 1024,
+       listener_count: 100)
 #
 # And access this configuration in your application as:
 #

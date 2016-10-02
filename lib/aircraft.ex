@@ -8,8 +8,7 @@ defmodule Aircraft do
 
     # Define workers and child supervisors to be supervised
     children = [
-      # Starts a worker by calling: Aircraft.Worker.start_link(arg1, arg2, arg3)
-      # worker(Aircraft.Worker, [arg1, arg2, arg3]),
+      # worker(Aircraft.Listener, [])
     ]
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
