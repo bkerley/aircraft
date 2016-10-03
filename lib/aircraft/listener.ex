@@ -4,7 +4,7 @@ defmodule Aircraft.Listener do
   def start_link do
     opts = [port: e(:port),
             max_connections: e(:max_connections)]
-
+IO.inspect opts
     {:ok, _} = :ranch.start_listener(:aircraft,
                                      e(:listener_count),
                                      :ranch_tcp,

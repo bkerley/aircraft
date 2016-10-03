@@ -29,7 +29,8 @@ defmodule Aircraft.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
-      {:ranch, "~> 1.2"}
+      {:ranch, "~> 1.2"},
+      {:irc_parser, "~> 0.1"}
     ]
   end
 end

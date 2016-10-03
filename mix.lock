@@ -1,1 +1,2 @@
-%{"ranch": {:hex, :ranch, "1.2.1", "a6fb992c10f2187b46ffd17ce398ddf8a54f691b81768f9ef5f461ea7e28c762", [:make], []}}
+%{"irc_parser": {:hex, :irc_parser, "0.1.0", "13cebb772a464000d7f527910f50e1588c973220384f7684a7deb13b14f58474", [:rebar3], []},
+  "ranch": {:hex, :ranch, "1.2.1", "a6fb992c10f2187b46ffd17ce398ddf8a54f691b81768f9ef5f461ea7e28c762", [:make], []}}
