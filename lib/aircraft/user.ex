@@ -1,14 +1,15 @@
 defmodule Aircraft.User do
   defstruct [:ok, :closed, :error,
-             :nick, :ref, :socket, :transport, :opts, :buf]
+             :nick, :ref, :socket, :transport, :opts, buf: ""]
 
   @behaviour :gen_server
   @behaviour :ranch_protocol
 
   require Logger
 
-  alias Aircraft.User
   alias Aircraft.Channel
+  alias Aircraft.Message
+  alias Aircraft.User
 
   def start_link(ref, socket, transport, opts) do
     :proc_lib.start_link(__MODULE__,
@@ -25,7 +26,7 @@ defmodule Aircraft.User do
   def init(state = %User{ref: ref,
                          socket: socket,
                          transport: transport}) do
-    :ok = :proc_lib.init_ack({:ok, ref})
+    :ok = :proc_lib.init_ack({:ok, self})
     Logger.info "init state #{:io_lib.format("~p", [state])}"
     :ok = :ranch.accept_ack(ref)
     Logger.info "accepted ack"
@@ -53,16 +54,18 @@ defmodule Aircraft.User do
     Logger.info data
     {ircmesgs, new_buf} = parse_mesg(buf <> data)
 
-    Logger.info "parsed #{length(ircmesgs)} messages"
+    for m <- ircmesgs do
+      Logger.info :io_lib.format("~p", [m])
+    end
 
     :ok = transport.setopts(socket, active: :once)
 
-    {:ok, %User{user | buf: new_buf}}
+    {:noreply, %User{user | buf: new_buf}}
   end
 
   def handle_info(other, state) do
     Logger.info :io_lib.format("~p", [other])
-    {:ok, state}
+    {:noreply, state}
   end
 
   def handle_call(_request, _from, state) do
@@ -89,7 +92,7 @@ defmodule Aircraft.User do
         finished_messages = Enum.take(multiple_mesgs, finished_message_count)
         unfinished_message = List.last(multiple_mesgs)
 
-        {Enum.map(finished_messages, &:irc_parser.parse(&1)),
+        {Enum.map(finished_messages, &Message.parse(&1)),
          unfinished_message}
     end
   end
