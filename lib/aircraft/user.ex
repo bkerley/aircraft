@@ -1,6 +1,8 @@
 defmodule Aircraft.User do
   defstruct [:ok, :closed, :error,
-             :nick, :ref, :socket, :transport, :opts, buf: ""]
+             :nick, channels: %{},
+             :ref, :socket, :transport, :opts,
+             buf: ""]
 
   @behaviour :gen_server
   @behaviour :ranch_protocol
@@ -15,10 +17,10 @@ defmodule Aircraft.User do
     :proc_lib.start_link(__MODULE__,
                                  :init,
                                  [%User{nick: "zedo",
-                                       ref: ref,
-                                       socket: socket,
-                                       transport: transport,
-                                       opts: opts}])
+                                        ref: ref,
+                                        socket: socket,
+                                        transport: transport,
+                                        opts: opts}])
   end
 
 
@@ -56,6 +58,7 @@ defmodule Aircraft.User do
 
     for m <- ircmesgs do
       Logger.info :io_lib.format("~p", [m])
+      process(m, user)
     end
 
     :ok = transport.setopts(socket, active: :once)
@@ -82,6 +85,11 @@ defmodule Aircraft.User do
 
   def terminate(_reason, _state) do
     :ok
+  end
+
+  defp process(join_message = %Message{command: "join"},
+               user = %User{}) do
+    ChannelRegistry.join(user, join_message)
   end
 
   defp parse_mesg(buf) do

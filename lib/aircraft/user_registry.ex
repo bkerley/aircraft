@@ -20,7 +20,7 @@ defmodule Aircraft.UserRegistry do
     GenServer.cast(registry, {:deregister, nick})
   end
 
-  def init(state = %UserRegistry) do
+  def init(state // %UserRegistry{}) do
     {:ok, state}
   end
 
@@ -44,7 +44,6 @@ defmodule Aircraft.UserRegistry do
                   state = %UserRegistry{nicks: nicks, refs: refs}) do
     new_state = case Map.get(nicks, nick) do
                   %RegistryEntry{name: nick,
-                                 pid: user_pid,
                                   ref: ref} ->
                     Process.demonitor(ref)
                     struct(state,
@@ -53,6 +52,18 @@ defmodule Aircraft.UserRegistry do
                   _ -> state
                 end
     {:noreply, new_state}
-    end
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, _reason},
+                  state = %UserRegistry{nicks: nicks, refs: refs}) do
+    new_state = case Map.get(refs, ref) do
+                  %RegistryEntry{name: nick,
+                                  ref: ^ref} ->
+                    struct(state,
+                           nicks: Map.delete(nicks, nick),
+                           refs: Map.delete(refs, ref))
+                  _ -> state
+                end
+    {:noreply, new_state}
   end
 end
