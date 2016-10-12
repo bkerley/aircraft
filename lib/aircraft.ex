@@ -8,7 +8,9 @@ defmodule Aircraft do
 
     # Define workers and child supervisors to be supervised
     children = [
-      worker(Aircraft.Listener, [])
+      worker(Aircraft.Listener, []),
+      worker(Aircraft.ChannelRegistry, []),
+      worker(Aircraft.UserRegistry, [])
     ]
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html

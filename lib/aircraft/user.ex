@@ -1,8 +1,8 @@
 defmodule Aircraft.User do
   defstruct [:ok, :closed, :error,
-             :nick, channels: %{},
+             :nick,
              :ref, :socket, :transport, :opts,
-             buf: ""]
+             channels: %{}, buf: ""]
 
   @behaviour :gen_server
   @behaviour :ranch_protocol
@@ -10,7 +10,9 @@ defmodule Aircraft.User do
   require Logger
 
   alias Aircraft.Channel
+  alias Aircraft.ChannelRegistry
   alias Aircraft.Message
+  alias Aircraft.RegistryEntry
   alias Aircraft.User
 
   def start_link(ref, socket, transport, opts) do
@@ -23,7 +25,9 @@ defmodule Aircraft.User do
                                         opts: opts}])
   end
 
-
+  def reply(user_pid, message) do
+    :gen_server.cast(user_pid, {:reply, message})
+  end
 
   def init(state = %User{ref: ref,
                          socket: socket,
@@ -75,6 +79,22 @@ defmodule Aircraft.User do
     {:reply, :ok, state}
   end
 
+  def handle_cast({:reply, {message = %Message{command: "332",
+                                               params: [channel_name,
+                                                        join_message]},
+                            channel_pid}},
+                  state = %User{transport: transport,
+                                socket: socket,
+                                channels: channels}) do
+    ref = Process.monitor(channel_pid)
+    rec = %RegistryEntry{name: channel_name,
+                         pid: channel_pid,
+                         ref: ref}
+    new_state = struct(state, channels: Map.put(channels, channel_name, rec))
+    transport.send(socket, ["332", " ", channel_name, " :", join_message])
+    {:noreply, new_state}
+  end
+
   def handle_cast(_request, state) do
     {:noreply, state}
   end
@@ -90,6 +110,19 @@ defmodule Aircraft.User do
   defp process(join_message = %Message{command: "join"},
                user = %User{}) do
     ChannelRegistry.join(user, join_message)
+  end
+
+  defp process(privmsg_message = %Message{command: "privmsg",
+                                          params: [destination | message]},
+               user = %User{channels: channels}) do
+    channel = Map.get(channels, destination, nil)
+    case channel do
+      %RegistryEntry{pid: channel_pid} ->
+        Channel.privmsg(channel_pid,
+                        String.join(message, " "))
+      _ ->
+        false
+    end
   end
 
   defp parse_mesg(buf) do

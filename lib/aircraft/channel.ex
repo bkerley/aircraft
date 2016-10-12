@@ -1,10 +1,12 @@
 defmodule Aircraft.Channel do
-  defstruct name: "#default", nicks: %{}, pids: %{}, refs: %{}
+  defstruct [:owner, name: "#default", nicks: %{}, pids: %{}, refs: %{}]
 
   use GenServer
 
   alias Aircraft.Channel
   alias Aircraft.Message
+  alias Aircraft.RegistryEntry
+  alias Aircraft.User
 
   def start_link do
     GenServer.start_link(__MODULE__, %Channel{})
@@ -15,13 +17,17 @@ defmodule Aircraft.Channel do
   end
 
   def join(channel_pid, nick) do
-    GenServer.call(channel_pid, {:join, nick})
+    join(channel_pid, nick, self)
+  end
+
+  def join(channel_pid, nick, user_pid) do
+    GenServer.call(channel_pid, {:join, nick, user_pid})
   end
 
   def create(channel_name, owning_user, owning_user_pid) do
     {:ok, channel_pid} = GenServer.start_link(__MODULE__,
                                               %Channel{name: channel_name})
-    GenServer.call(channel_pid, {:join, owning_user, owning_user_pid})
+    GenServer.call(channel_pid, {:create, owning_user, owning_user_pid})
     channel_pid
   end
 
@@ -37,19 +43,41 @@ defmodule Aircraft.Channel do
     GenServer.cast(channel_pid, {:part, message, self})
   end
 
-  def handle_call({:join, nick},
-                  {user_pid, _tag},
-                  state = %Channel{nicks: nicks, pids: pids}) do
+  def handle_call({:create, owning_user = %User{nick: nick}, user_pid},
+                  {_registry_pid, _registry_tag},
+                  state = %Channel{nicks: nicks, pids: pids, refs: refs}) do
     ref = Process.monitor(user_pid)
     rec = %RegistryEntry{name: nick,
                          pid: user_pid,
                          ref: ref}
+
     {:reply,
      :ok,
      %Channel{state |
               nicks: Map.put(nicks, nick, rec),
-              refs: Map.put(refs, ref, rec)
-              pids: Map.put(pids, from_pid, rec)}}
+              refs: Map.put(refs, ref, rec),
+              pids: Map.put(pids, user_pid, rec),
+              owner: user_pid}}
+  end
+
+  def handle_call({:join, nick, user_pid},
+                  {sender_pid, _tag},
+                  state = %Channel{name: channel_name,
+                                   nicks: nicks,
+                                   pids: pids,
+                                   refs: refs}) do
+    ref = Process.monitor(user_pid)
+    rec = %RegistryEntry{name: nick,
+                         pid: user_pid,
+                         ref: ref}
+    User.reply(user_pid, %Message{command: "332",
+                                  params: [channel_name, "No topic is set"]})
+    {:reply,
+     :ok,
+     %Channel{state |
+              nicks: Map.put(nicks, nick, rec),
+              refs: Map.put(refs, ref, rec),
+              pids: Map.put(pids, user_pid, rec)}}
   end
 
   def handle_call({:nicks}, _from, state = %Channel{nicks: nicks}) do
@@ -82,5 +110,12 @@ defmodule Aircraft.Channel do
   def fanout(destination_pids, message) do
     destination_pids
     |> Enum.each(&send(&1, message))
+  end
+
+  defp remove(state = %Channel{nicks: nicks, refs: refs, pids: pids},
+              departed = %RegistryEntry{}) do
+    struct(state, nicks: Map.delete(nicks, departed.name),
+           refs: Map.delete(refs, departed.ref),
+           pids: Map.delete(pids, departed.pid))
   end
 end

@@ -8,19 +8,19 @@ defmodule Aircraft.UserRegistry do
 
   use GenServer
 
-  def start_link(name // @default_name) do
-    GenServer.start_link(__MODULE__, [], name: name)
+  def start_link(name \\ @default_name) do
+    GenServer.start_link(__MODULE__, %UserRegistry{}, name: name)
   end
 
-  def register(nick, registry // @default_name) do
+  def register(nick, registry \\ @default_name) do
     GenServer.call(registry, {:register, nick})
   end
 
-  def deregister(nick, registry // @default_name) do
+  def deregister(nick, registry \\ @default_name) do
     GenServer.cast(registry, {:deregister, nick})
   end
 
-  def init(state // %UserRegistry{}) do
+  def init(state \\ %UserRegistry{}) do
     {:ok, state}
   end
 
