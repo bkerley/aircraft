@@ -30,7 +30,8 @@ defmodule Aircraft.Mixfile do
   defp deps do
     [
       {:ranch, "~> 1.2"},
-      {:irc_parser, "~> 0.1"}
+      {:irc_parser, "~> 0.1"},
+      {:uuid, "~> 1.1"}
     ]
   end
 end

@@ -3,6 +3,8 @@ defmodule Aircraft.Channel do
 
   use GenServer
 
+  require Logger
+
   alias Aircraft.Channel
   alias Aircraft.Message
   alias Aircraft.RegistryEntry
@@ -20,8 +22,8 @@ defmodule Aircraft.Channel do
     join(channel_pid, nick, self)
   end
 
-  def join(channel_pid, nick, user_pid) do
-    GenServer.call(channel_pid, {:join, nick, user_pid})
+  def join(channel_pid, user, user_pid) do
+    GenServer.call(channel_pid, {:join, user, user_pid})
   end
 
   def create(channel_name, owning_user, owning_user_pid) do
@@ -39,45 +41,26 @@ defmodule Aircraft.Channel do
     GenServer.call(channel_pid, {:privmsg, message})
   end
 
+  def nick(channel_pid, message) do
+    GenServer.cast(channel_pid, {:nick, message})
+  end
+
   def part(channel_pid, message) do
     GenServer.cast(channel_pid, {:part, message, self})
   end
 
-  def handle_call({:create, owning_user = %User{nick: nick}, user_pid},
+  def handle_call({:create, user = %User{}, user_pid},
                   {_registry_pid, _registry_tag},
-                  state = %Channel{nicks: nicks, pids: pids, refs: refs}) do
-    ref = Process.monitor(user_pid)
-    rec = %RegistryEntry{name: nick,
-                         pid: user_pid,
-                         ref: ref}
+                  state = %Channel{}) do
 
-    {:reply,
-     :ok,
-     %Channel{state |
-              nicks: Map.put(nicks, nick, rec),
-              refs: Map.put(refs, ref, rec),
-              pids: Map.put(pids, user_pid, rec),
-              owner: user_pid}}
+    Logger.info "creating channel #{state.name} for #{user.nick}"
+    perform_join(state, user, user_pid)
   end
 
-  def handle_call({:join, nick, user_pid},
+  def handle_call({:join, user, user_pid},
                   {sender_pid, _tag},
-                  state = %Channel{name: channel_name,
-                                   nicks: nicks,
-                                   pids: pids,
-                                   refs: refs}) do
-    ref = Process.monitor(user_pid)
-    rec = %RegistryEntry{name: nick,
-                         pid: user_pid,
-                         ref: ref}
-    User.reply(user_pid, %Message{command: "332",
-                                  params: [channel_name, "No topic is set"]})
-    {:reply,
-     :ok,
-     %Channel{state |
-              nicks: Map.put(nicks, nick, rec),
-              refs: Map.put(refs, ref, rec),
-              pids: Map.put(pids, user_pid, rec)}}
+                  state = %Channel{}) do
+    perform_join(state, user, user_pid)
   end
 
   def handle_call({:nicks}, _from, state = %Channel{nicks: nicks}) do
@@ -87,11 +70,11 @@ defmodule Aircraft.Channel do
   def handle_call({:privmsg, message},
                   {from_pid, _tag},
                   state = %Channel{name: channel_name, pids: pids}) do
-    from_nick = pids[from_pid]
+    %RegistryEntry{name: from_nick} = pids[from_pid]
 
-    pids
-    |> Map.keys
-    |> Enum.each(&send(&1, {channel_name, from_nick, message}))
+    fanout(Map.keys(pids), %Message{prefix: from_nick,
+                                    command: "PRIVMSG",
+                                    params: [channel_name, message]})
 
     {:reply, :ok, state}
   end
@@ -109,7 +92,29 @@ defmodule Aircraft.Channel do
 
   def fanout(destination_pids, message) do
     destination_pids
-    |> Enum.each(&send(&1, message))
+    |> Enum.each(&GenServer.cast(&1, message))
+  end
+
+  defp perform_join(state = %Channel{name: name,
+                             nicks: nicks,
+                             pids: pids,
+                             refs: refs},
+            user = %User{nick: nick},
+            user_pid) do
+    ref = Process.monitor(user_pid)
+    rec = %RegistryEntry{name: nick,
+                         pid: user_pid,
+                         ref: ref}
+
+    User.reply(user_pid, {%Message{command: "332",
+                                   params: [name, "No topic is set"]},
+                          self})
+    {:reply,
+     :ok,
+     %Channel{state |
+              nicks: Map.put(nicks, nick, rec),
+              refs: Map.put(refs, ref, rec),
+              pids: Map.put(pids, user_pid, rec)}}
   end
 
   defp remove(state = %Channel{nicks: nicks, refs: refs, pids: pids},

@@ -14,6 +14,7 @@ defmodule Aircraft.User do
   alias Aircraft.Message
   alias Aircraft.RegistryEntry
   alias Aircraft.User
+  alias Aircraft.UserRegistry
 
   def start_link(ref, socket, transport, opts) do
     :proc_lib.start_link(__MODULE__,
@@ -33,19 +34,21 @@ defmodule Aircraft.User do
                          socket: socket,
                          transport: transport}) do
     :ok = :proc_lib.init_ack({:ok, self})
-    Logger.info "init state #{:io_lib.format("~p", [state])}"
     :ok = :ranch.accept_ack(ref)
-    Logger.info "accepted ack"
 
     {ok, closed, error} = transport.messages
 
     :ok = transport.setopts(socket, active: :once)
-    Logger.info "set active"
+
+    initial_nick = UUID.uuid4
+
+    UserRegistry.register(initial_nick)
 
     :gen_server.enter_loop(__MODULE__,
                            [],
                            struct(state,
-                                  %{ok: ok, closed: closed, error: error}))
+                                  %{ok: ok, closed: closed, error: error,
+                                    nick: initial_nick}))
   end
 
   def init(other) do
@@ -60,14 +63,22 @@ defmodule Aircraft.User do
     Logger.info data
     {ircmesgs, new_buf} = parse_mesg(buf <> data)
 
-    for m <- ircmesgs do
-      Logger.info :io_lib.format("~p", [m])
-      process(m, user)
-    end
+    {responses, updated_user} = ircmesgs
+    |> Enum.reduce({[], user}, fn (message, {replies, user}) ->
+      {new_reply, update_user} = process(message, user)
+      {[new_reply | replies], update_user}
+    end)
+
+    responses
+    |> Enum.filter(fn(reply) -> reply end)
+    |> Enum.each(fn(reply) ->
+      :ok = transport.send(socket,
+                           Message.to_iodata(reply))
+    end)
 
     :ok = transport.setopts(socket, active: :once)
 
-    {:noreply, %User{user | buf: new_buf}}
+    {:noreply, %User{updated_user | buf: new_buf}}
   end
 
   def handle_info(other, state) do
@@ -91,11 +102,23 @@ defmodule Aircraft.User do
                          pid: channel_pid,
                          ref: ref}
     new_state = struct(state, channels: Map.put(channels, channel_name, rec))
-    transport.send(socket, ["332", " ", channel_name, " :", join_message])
+    :ok = transport.send(socket,
+                         ["332", " ", channel_name, " :", join_message, "\r\n"])
     {:noreply, new_state}
   end
 
-  def handle_cast(_request, state) do
+  def handle_cast(message = %Message{},
+                  state = %User{transport: transport,
+                                socket: socket,
+                                channels: channels}) do
+    IO.inspect message
+    :ok = transport.send(socket, Message.to_iodata(message))
+    {:noreply, state}
+  end
+
+  def handle_cast(request, state) do
+    Logger.info "Unknown request to user #{state.nick}"
+    IO.inspect request
     {:noreply, state}
   end
 
@@ -107,21 +130,48 @@ defmodule Aircraft.User do
     :ok
   end
 
-  defp process(join_message = %Message{command: "join"},
+  defp process(join_message = %Message{command: "JOIN"},
                user = %User{}) do
     ChannelRegistry.join(user, join_message)
+    {false, user}
   end
 
-  defp process(privmsg_message = %Message{command: "privmsg",
-                                          params: [destination | message]},
+  defp process(privmsg_message = %Message{command: "PRIVMSG",
+                                          params: [destination, message]},
                user = %User{channels: channels}) do
     channel = Map.get(channels, destination, nil)
     case channel do
       %RegistryEntry{pid: channel_pid} ->
-        Channel.privmsg(channel_pid,
-                        String.join(message, " "))
+        Channel.privmsg(channel_pid, message)
       _ ->
         false
+    end
+    {false, user}
+  end
+
+  defp process(nick_message = %Message{command: "NICK",
+                                       params: [new_nickname | _rest]},
+               user = %User{nick: old_nickname, channels: channels}) do
+    case UserRegistry.nick(old_nickname, new_nickname) do
+      :ok ->
+        new_nick_message = %Message{prefix: old_nickname,
+                                    command: "NICK",
+                                    params: [new_nickname]}
+
+        for %RegistryEntry{pid: pid} <- channels do
+          Channel.nick(pid, new_nick_message)
+        end
+
+        {new_nick_message, %User{user | nick: new_nickname}}
+      :in_use ->
+        {%Message{command: "436",
+                  params: [new_nickname, "Nickname is already in use"]},
+         user}
+      _other ->
+        {%Message{command: "432",
+                  params: [new_nickname,
+                           "Unexpected response from user registry"]},
+         user}
     end
   end
 
