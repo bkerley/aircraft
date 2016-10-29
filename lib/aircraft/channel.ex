@@ -49,11 +49,15 @@ defmodule Aircraft.Channel do
     GenServer.cast(channel_pid, {:part, message, self})
   end
 
+  def quit(channel_pid, quit_message) do
+    GenServer.cast(channel_pid, {:quit, quit_message, self})
+  end
+
   def handle_call({:create, user = %User{}, user_pid},
                   {_registry_pid, _registry_tag},
                   state = %Channel{}) do
 
-    Logger.info "creating channel #{state.name} for #{user.nick}"
+    Logger.info "create #{state.name} for #{user.nick}"
     perform_join(state, user, user_pid)
   end
 
@@ -83,11 +87,22 @@ defmodule Aircraft.Channel do
                   state = %Channel{name: name, pids: pids}) do
     departed = pids[user_pid]
 
-    fanout(pids.keys, [:part, name, departed.name, message])
+    fanout(Map.keys(pids), [:part, name, departed.name, message])
 
     new_state = remove(state, departed)
 
     {:noreply, new_state}
+  end
+
+  def handle_cast({:quit, message, user_pid},
+                  state = %Channel{name: name, pids: pids}) do
+    departure = %RegistryEntry{name: from_nick} = pids[user_pid]
+
+    fanout(Map.keys(pids), %Message{prefix: from_nick,
+                                    command: "QUIT",
+                                    params: [message]})
+
+    {:noreply, remove(state, departure)}
   end
 
   def fanout(destination_pids, message) do
@@ -106,15 +121,23 @@ defmodule Aircraft.Channel do
                          pid: user_pid,
                          ref: ref}
 
+    updated_channel = struct(state ,
+                             nicks: Map.put(nicks, nick, rec),
+                             refs: Map.put(refs, ref, rec),
+                             pids: Map.put(pids, user_pid, rec))
+
+    fanout(Map.keys(updated_channel.pids),
+           %Message{command: "JOIN",
+                    params: [name],
+                    prefix: nick})
+
     User.reply(user_pid, {%Message{command: "332",
-                                   params: [name, "No topic is set"]},
+                                   params: [name, "topics not supported lol"]},
                           self})
-    {:reply,
-     :ok,
-     %Channel{state |
-              nicks: Map.put(nicks, nick, rec),
-              refs: Map.put(refs, ref, rec),
-              pids: Map.put(pids, user_pid, rec)}}
+
+    User.reply(user_pid, {:names, name, Map.keys(updated_channel.nicks)})
+
+    {:reply, :ok, updated_channel}
   end
 
   defp remove(state = %Channel{nicks: nicks, refs: refs, pids: pids},

@@ -14,6 +14,12 @@ config(:aircraft,
        port: 6667,
        max_connections: 1024,
        listener_count: 100)
+
+config(:logger,
+       :console,
+       format: "\n$time $metadata[$level] $message\n",
+       metadata: [:module, :function, :line]
+)
 #
 # And access this configuration in your application as:
 #

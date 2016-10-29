@@ -1,6 +1,8 @@
 defmodule Aircraft.UserRegistry do
   defstruct nicks: %{}, refs: %{}
 
+  require Logger
+
   alias Aircraft.UserRegistry
   alias Aircraft.RegistryEntry
 
@@ -31,6 +33,7 @@ defmodule Aircraft.UserRegistry do
   def handle_call({:register, nick},
                   {user_pid, _user_tag},
                   state = %UserRegistry{nicks: nicks, refs: refs}) do
+    Logger.info "registering #{nick}"
     ref = Process.monitor(user_pid)
 
     rec = %RegistryEntry{name: nick,
@@ -48,8 +51,10 @@ defmodule Aircraft.UserRegistry do
                   {user_pid, _user_tag},
                   state = %UserRegistry{nicks: nicks, refs: refs}) do
     if Map.has_key?(nicks, new_nickname) do
-      :in_use
+      Logger.info "nick #{old_nickname} to #{new_nickname} in use"
+      {:reply, :in_use, state}
     else
+      Logger.info "nick #{old_nickname} to #{new_nickname} ok"
       user = Map.get(nicks, old_nickname)
       modified_user = %RegistryEntry{user | name: new_nickname}
 
@@ -73,10 +78,13 @@ defmodule Aircraft.UserRegistry do
                   %RegistryEntry{name: nick,
                                   ref: ref} ->
                     Process.demonitor(ref)
+                    Logger.info "deregister #{nick} ok"
                     struct(state,
                            nicks: Map.delete(nicks, nick),
                            refs: Map.delete(refs, ref))
-                  _ -> state
+                  _ ->
+                    Logger.info "deregister #{nick} unknown"
+                    state
                 end
     {:noreply, new_state}
   end
@@ -86,10 +94,13 @@ defmodule Aircraft.UserRegistry do
     new_state = case Map.get(refs, ref) do
                   %RegistryEntry{name: nick,
                                   ref: ^ref} ->
+                    Logger.info "DOWN: removing #{nick}"
                     struct(state,
                            nicks: Map.delete(nicks, nick),
                            refs: Map.delete(refs, ref))
-                  _ -> state
+                  _ ->
+                    Logger.info "DOWN: unknown user"
+                    state
                 end
     {:noreply, new_state}
   end

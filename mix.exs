@@ -14,9 +14,12 @@ defmodule Aircraft.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger, :ranch],
+    [applications: applications_for(Mix.env),
      mod: {Aircraft, []}]
   end
+
+  defp applications_for(:dev), do: [:remix | applications_for(:any)]
+  defp applications_for(_any), do: [:logger, :ranch]
 
   # Dependencies can be Hex packages:
   #
@@ -31,7 +34,8 @@ defmodule Aircraft.Mixfile do
     [
       {:ranch, "~> 1.2"},
       {:irc_parser, "~> 0.1"},
-      {:uuid, "~> 1.1"}
+      {:uuid, "~> 1.1"},
+      {:remix, "~> 0.0.2", only: :dev}
     ]
   end
 end

@@ -1,6 +1,8 @@
 defmodule Aircraft.ChannelRegistry do
   defstruct names: %{}, refs: %{}
 
+  require Logger
+
   alias Aircraft.Channel
   alias Aircraft.ChannelRegistry
   alias Aircraft.Message
@@ -26,7 +28,7 @@ defmodule Aircraft.ChannelRegistry do
   def handle_call({:join,
                    user = %User{},
                    _message = %Message{
-                     command: "join",
+                     command: "JOIN",
                             params: [channels | rest]}
                   },
                   {user_pid, _user_tag},
@@ -42,23 +44,26 @@ defmodule Aircraft.ChannelRegistry do
 
     {:reply,
      :ok,
-     # new_state}
-     state}
+     new_state}
   end
 
-  defp join(user = %User{channels: existing_memberships},
+  defp join(user = %User{nick: nick,
+                         channels: existing_memberships},
             user_pid,
             existing_channels,
             {channel_name, _key},
             state) do
 
     cond do
-     Map.get(existing_memberships, channel_name, false) ->
+      Map.get(existing_memberships, channel_name, false) ->
+        Logger.info("join #{nick} to #{channel_name}: already in")
         state
       channel = Map.get(existing_channels, channel_name, false) ->
+        Logger.info("join #{nick} to #{channel_name}: ok")
         Channel.join(channel, user, user_pid)
         state
       true ->
+        Logger.info("join #{nick} to #{channel_name}: creating")
         channel_pid = Channel.create(channel_name, user, user_pid)
         ref = Process.monitor(channel_pid)
         rec = %RegistryEntry{name: channel_name,

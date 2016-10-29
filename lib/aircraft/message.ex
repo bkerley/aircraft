@@ -37,7 +37,11 @@ defmodule Aircraft.Message do
     # assume prefix, command, and params are chardata
     %Message{prefix: IO.chardata_to_string(prefix),
              command: IO.chardata_to_string(command),
-             params: Enum.map(params, &IO.chardata_to_string(&1))}
+             params: Enum.map(params, fn(param) ->
+               param
+               |> IO.chardata_to_string
+               |> String.trim_trailing
+             end)}
   end
 
   defp normalize_command(mesg = %Message{command: command}) do
